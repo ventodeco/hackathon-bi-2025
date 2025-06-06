@@ -14,6 +14,9 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
     env_logger::init();
 
+    let host = std::env::var("HOST").expect("HOST must be set");
+    let port = std::env::var("PORT").expect("PORT must be set");
+
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -30,7 +33,7 @@ async fn main() -> std::io::Result<()> {
                     .service(controllers::auth::login),
             )
     })
-    .bind(("127.0.0.1", 8081))?
+    .bind(format!("{}:{}", host, port))?
     .run()
     .await
 }
