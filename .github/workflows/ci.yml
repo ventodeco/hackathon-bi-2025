@@ -13,9 +13,9 @@ jobs:
       postgres:
         image: postgres:14
         env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: backend_project
         ports:
           - 5432:5432
         options: >-
@@ -45,8 +45,8 @@ jobs:
     - name: Setup environment
       run: |
         cp .env.example .env
-        sed -i "s|postgres://postgres:postgres@localhost:5432/backend_project|postgres://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}|g" .env
-        sed -i "s|your-super-secret-key-change-this-in-production|${{ secrets.JWT_SECRET }}|g" .env
+        cargo install sqlx-cli
+        sqlx migrate run
     
     - name: Build
       run: cargo build --verbose
