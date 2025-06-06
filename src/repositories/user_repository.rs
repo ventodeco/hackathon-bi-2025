@@ -14,7 +14,11 @@ impl UserRepository {
         sqlx::query_as!(
             User,
             r#"
-            SELECT id, name, email, password_hash, created_at, updated_at
+            SELECT 
+                id, 
+                name, 
+                email, 
+                password_hash
             FROM users
             WHERE email = $1
             "#,
@@ -30,7 +34,11 @@ impl UserRepository {
             r#"
             INSERT INTO users (name, email, password_hash)
             VALUES ($1, $2, $3)
-            RETURNING id, name, email, password_hash, created_at, updated_at
+            RETURNING 
+                id, 
+                name, 
+                email, 
+                password_hash
             "#,
             name,
             email,

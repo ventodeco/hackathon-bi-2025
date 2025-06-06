@@ -48,23 +48,33 @@ impl AuthService {
     }
 
     pub async fn login(&self, request: LoginRequest) -> Result<AuthResponse, anyhow::Error> {
+        let start = std::time::Instant::now();
         // Find user
         let user = self
             .user_repository
-            .find_by_email(&request.email)
+            .find_by_email(&request.email)  
             .await?
             .ok_or_else(|| anyhow::anyhow!("Invalid email or password"))?;
 
+        let duration = start.elapsed();
+        log::info!("User find process took: {:?}", duration);
+
+        let start = std::time::Instant::now();
         // Verify password
         if !verify(&request.password, &user.password_hash)? {
             return Err(anyhow::anyhow!("Invalid email or password"));
         }
 
+        let duration = start.elapsed();
+        log::info!("Password verify process took: {:?}", duration);
+
+        let start = std::time::Instant::now();
         // Generate token
         self.generate_token(user.id)
     }
 
     fn generate_token(&self, user_id: i32) -> Result<AuthResponse, anyhow::Error> {
+        let start = std::time::Instant::now();
         let expiration = Utc::now() + Duration::hours(24);
         let claims = Claims {
             sub: user_id,
@@ -76,6 +86,9 @@ impl AuthService {
             &claims,
             &EncodingKey::from_secret(self.jwt_secret.as_bytes()),
         )?;
+
+        let duration = start.elapsed();
+        log::info!("Token generate process took: {:?}", duration);
 
         Ok(AuthResponse {
             token,

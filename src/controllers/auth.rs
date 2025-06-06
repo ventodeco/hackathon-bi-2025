@@ -7,19 +7,13 @@ use crate::{
     services::auth_service::AuthService,
 };
 
-pub fn auth_scope() -> Scope {
-    web::scope("/auth")
-        .service(register)
-        .service(login)
-}
-
 #[actix_web::post("/register")]
 async fn register(
     pool: web::Data<PgPool>,
     request: web::Json<RegisterRequest>,
 ) -> HttpResponse {
     // Validate request
-    if let Err(errors) = request.validate() {
+    if let Err(_) = request.validate() {
         return HttpResponse::UnprocessableEntity().json(ApiResponse::<AuthResponse> {
             success: false,
             data: None,
@@ -75,8 +69,9 @@ async fn login(
     pool: web::Data<PgPool>,
     request: web::Json<LoginRequest>,
 ) -> HttpResponse {
+    let start = std::time::Instant::now();
     // Validate request
-    if let Err(errors) = request.validate() {
+    if let Err(_) = request.validate() {
         return HttpResponse::UnprocessableEntity().json(ApiResponse::<AuthResponse> {
             success: false,
             data: None,
@@ -88,19 +83,35 @@ async fn login(
         });
     }
 
+    let duration = start.elapsed();
+    log::info!("Validation process took: {:?}", duration);
+
+    let start = std::time::Instant::now();
     // Get JWT secret from environment
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
+    let duration = start.elapsed();
+    log::info!("JWT secret process took: {:?}", duration);
+
+    let start = std::time::Instant::now();
     // Create auth service
     let auth_service = AuthService::new(pool.get_ref().clone(), jwt_secret);
 
+    let duration = start.elapsed();
+    log::info!("Auth service process took: {:?}", duration);
+
     // Handle login
+    let start = std::time::Instant::now();
     match auth_service.login(request.into_inner()).await {
-        Ok(response) => HttpResponse::Ok().json(ApiResponse {
-            success: true,
-            data: Some(response),
-            errors: None,
-        }),
+        Ok(response) => {
+            let duration = start.elapsed();
+            log::info!("Login process took: {:?}", duration);
+            HttpResponse::Ok().json(ApiResponse {
+                success: true,
+                data: Some(response),
+                errors: None,
+            })
+        },
         Err(e) => {
             if e.to_string() == "Invalid email or password" {
                 HttpResponse::UnprocessableEntity().json(ApiResponse::<AuthResponse> {
