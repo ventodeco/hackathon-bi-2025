@@ -9,4 +9,5 @@ Cargo.lock
 *.iml
 *.swp
 *.swo
-.sqlx
+.sqlx/
+.cursor/

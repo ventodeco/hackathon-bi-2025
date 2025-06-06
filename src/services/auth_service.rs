@@ -1,4 +1,4 @@
-use bcrypt::{hash, verify, DEFAULT_COST};
+use argon2::{self, password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString}};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
@@ -29,19 +29,37 @@ impl AuthService {
     }
 
     pub async fn register(&self, request: RegisterRequest) -> Result<AuthResponse, anyhow::Error> {
+        let start = std::time::Instant::now();
         // Check if user exists
         if let Some(_) = self.user_repository.find_by_email(&request.email).await? {
             return Err(anyhow::anyhow!("User already exists"));
         }
 
-        // Hash password
-        let password_hash = hash(request.password.as_bytes(), DEFAULT_COST)?;
+        let duration = start.elapsed();
+        log::info!("User check process took: {:?}", duration);
 
+        let start = std::time::Instant::now();
+        // Hash password with Argon2
+        let salt = SaltString::generate(&mut argon2::password_hash::rand_core::OsRng);
+        let argon2 = argon2::Argon2::default();
+        let password_hash = PasswordHasher::hash_password(
+            &argon2,
+            request.password.as_bytes(),
+            &salt,
+        ).map_err(|e| anyhow::anyhow!("Failed to hash password: {}", e))?;
+
+        let duration = start.elapsed();
+        log::info!("Password hash process took: {:?}", duration);
+
+        let start = std::time::Instant::now();
         // Create user
         let user = self
             .user_repository
-            .create(&request.name, &request.email, &password_hash)
+            .create(&request.name, &request.email, &password_hash.to_string())
             .await?;
+
+        let duration = start.elapsed();
+        log::info!("User creation process took: {:?}", duration);
 
         // Generate token
         self.generate_token(user.id)
@@ -52,7 +70,7 @@ impl AuthService {
         // Find user
         let user = self
             .user_repository
-            .find_by_email(&request.email)  
+            .find_by_email(&request.email)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Invalid email or password"))?;
 
@@ -60,15 +78,17 @@ impl AuthService {
         log::info!("User find process took: {:?}", duration);
 
         let start = std::time::Instant::now();
-        // Verify password
-        if !verify(&request.password, &user.password_hash)? {
+        // Verify password with Argon2
+        let parsed_hash = PasswordHash::new(&user.password_hash)
+            .map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
+        let argon2 = argon2::Argon2::default();
+        if PasswordVerifier::verify_password(&argon2, request.password.as_bytes(), &parsed_hash).is_err() {
             return Err(anyhow::anyhow!("Invalid email or password"));
         }
 
         let duration = start.elapsed();
         log::info!("Password verify process took: {:?}", duration);
 
-        let start = std::time::Instant::now();
         // Generate token
         self.generate_token(user.id)
     }
