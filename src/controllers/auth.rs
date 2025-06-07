@@ -1,4 +1,4 @@
-use actix_web::{web, HttpResponse, Scope};
+use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
 use validator::Validate;
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
 use crate::{
-    models::user::{AuthResponse, LoginRequest, RegisterRequest, User},
+    models::user::{AuthResponse, LoginRequest, RegisterRequest},
     repositories::user_repository::UserRepository,
 };
 
