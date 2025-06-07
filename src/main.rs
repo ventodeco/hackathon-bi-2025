@@ -17,7 +17,14 @@ async fn main() -> std::io::Result<()> {
     let host = std::env::var("HOST").expect("HOST must be set");
     let port = std::env::var("PORT").expect("PORT must be set");
 
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let database_url = format!(
+        "postgres://{}:{}@{}:{}/{}",
+        std::env::var("DB_USERNAME").expect("DB_USERNAME must be set"),
+        std::env::var("DB_PASSWORD").expect("DB_PASSWORD must be set"),
+        std::env::var("DB_HOST").expect("DB_HOST must be set"),
+        std::env::var("DB_PORT").expect("DB_PORT must be set"),
+        std::env::var("DB_NAME").expect("DB_NAME must be set")
+    );
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)

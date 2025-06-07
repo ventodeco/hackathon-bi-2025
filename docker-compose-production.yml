@@ -1,0 +1,5 @@
+  rust-app:
+    image: yourdockerhubusername/your-rust-app:${TAG:-latest}
+    restart: always
+    ports:
+      - "80:8080"

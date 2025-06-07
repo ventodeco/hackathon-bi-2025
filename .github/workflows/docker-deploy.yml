@@ -1,0 +1,46 @@
+name: Docker Deploy
+
+on:
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ventodeco/backend-project
+
+jobs:
+  docker-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up commit SHA tag
+        id: vars
+        run: echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: docker build -t $IMAGE_NAME:${{ env.TAG }} .
+
+      - name: Push Docker image
+        run: docker push $IMAGE_NAME:${{ env.TAG }}
+
+  deploy:
+    needs: docker-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH to VPS using Docker Compose
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_SSH_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ${{ secrets.VPS_APP_DIR }}
+            docker compose pull
+            docker compose up -d --remove-orphans
