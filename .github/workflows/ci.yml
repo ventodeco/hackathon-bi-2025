@@ -56,7 +56,7 @@ jobs:
         run: cargo test --verbose
 
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --release
 
       - name: Set up commit SHA tag
         id: vars
@@ -69,7 +69,8 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build Docker image
-        run: docker build -t $IMAGE_NAME:${{ env.TAG }} .
+        run: |
+          docker build -t $IMAGE_NAME:${{ env.TAG }} .
 
       - name: Push Docker image
         run: docker push $IMAGE_NAME:${{ env.TAG }}
