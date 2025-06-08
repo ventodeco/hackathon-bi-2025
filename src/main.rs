@@ -8,11 +8,17 @@ mod utils;
 use actix_web::{web, App, HttpServer};
 use dotenv::dotenv;
 use sqlx::postgres::PgPoolOptions;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
-    env_logger::init();
+    
+    // Initialize tracing with JSON format
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer().json())
+        .init();
 
     let host = std::env::var("HOST").expect("HOST must be set");
     let port = std::env::var("PORT").expect("PORT must be set");

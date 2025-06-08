@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
+use tracing::{info, info_span};
 use validator::Validate;
 
 use crate::{
@@ -69,6 +70,7 @@ async fn login(
     pool: web::Data<PgPool>,
     request: web::Json<LoginRequest>,
 ) -> HttpResponse {
+    let _span = info_span!("login-api", correlation_id = uuid::Uuid::new_v4().to_string()).entered();
     let start = std::time::Instant::now();
     // Validate request
     if let Err(_) = request.validate() {
@@ -83,29 +85,31 @@ async fn login(
         });
     }
 
+    info!(test = "uhuy", uhuy = "aaa", "Validation process took: {:?}", start.elapsed());
+
     let duration = start.elapsed();
-    log::info!("Validation process took: {:?}", duration);
+    info!("Validation process took: {:?}", duration);
 
     let start = std::time::Instant::now();
     // Get JWT secret from environment
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
     let duration = start.elapsed();
-    log::info!("JWT secret process took: {:?}", duration);
+    info!("JWT secret process took: {:?}", duration);
 
     let start = std::time::Instant::now();
     // Create auth service
     let auth_service = AuthService::new(pool.get_ref().clone(), jwt_secret);
 
     let duration = start.elapsed();
-    log::info!("Auth service process took: {:?}", duration);
+    info!("Auth service process took: {:?}", duration);
 
     // Handle login
     let start = std::time::Instant::now();
     match auth_service.login(request.into_inner()).await {
         Ok(response) => {
             let duration = start.elapsed();
-            log::info!("Login process took: {:?}", duration);
+            info!("Login process took: {:?}", duration);
             HttpResponse::Ok().json(ApiResponse {
                 success: true,
                 data: Some(response),
