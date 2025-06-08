@@ -10,7 +10,8 @@ env:
   IMAGE_NAME: ventodeco/backend-project
 
 jobs:
-  test:
+  test_build_push:
+    environment: ENV_STAGING
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -51,18 +52,11 @@ jobs:
           cargo install sqlx-cli
           sqlx migrate run
 
-      - name: Build
-        run: cargo build --verbose
-
       - name: Run tests
         run: cargo test --verbose
 
-  docker-push:
-    environment: ENV_STAGING
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build --verbose
 
       - name: Set up commit SHA tag
         id: vars
