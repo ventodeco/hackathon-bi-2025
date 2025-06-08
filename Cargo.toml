@@ -21,3 +21,4 @@ validator = { version = "0.16", features = ["derive"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 thiserror = "1.0"
 anyhow = "1.0"
+statsd = "0.13.0"

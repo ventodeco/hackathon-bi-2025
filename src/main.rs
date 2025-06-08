@@ -9,6 +9,7 @@ use actix_web::{web, App, HttpServer};
 use dotenv::dotenv;
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use crate::services::metrics_service::MetricsService;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -30,9 +31,18 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to create pool");
 
+    let pool = web::Data::new(pool);
+
+    let metrics_service = web::Data::new(MetricsService::new(
+        &std::env::var("STATSD_HOST").expect("STATSD_HOST must be set"),
+        std::env::var("STATSD_PORT").expect("STATSD_PORT must be set").parse::<u16>().unwrap(),
+        &std::env::var("STATSD_PREFIX").expect("STATSD_PREFIX must be set")
+    ));
+
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(pool.clone()))
+            .app_data(pool.clone())
+            .app_data(metrics_service.clone())
             .service(
                 web::scope("/v1")
                     .service(controllers::auth::register)
