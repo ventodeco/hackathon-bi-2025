@@ -70,6 +70,7 @@ jobs:
 
       - name: Build Docker image
         run: |
+          chmod +x target/release/backend-project
           docker build -t $IMAGE_NAME:${{ env.TAG }} .
 
       - name: Push Docker image
