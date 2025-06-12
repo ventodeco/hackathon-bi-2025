@@ -6,7 +6,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=backend_project
+      - POSTGRES_DB=hackathon_bi_2025
     ports:
       - "5432:5432"
     volumes:

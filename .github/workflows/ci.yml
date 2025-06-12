@@ -7,11 +7,11 @@ on:
     branches: [ master ]
 
 env:
-  IMAGE_NAME: ventodeco/backend-project
+  IMAGE_NAME: ventodeco/hackathon-bi-2025
 
 jobs:
   test_build_push:
-    environment: ENV_STAGING
+    environment: ENV_PRODUCTION
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -19,7 +19,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: backend_project
+          POSTGRES_DB: hackathon_bi_2025
         ports:
           - 5432:5432
         options: >-

@@ -26,7 +26,7 @@ async fn register(
             success: false,
             data: None,
             errors: Some(vec![ApiError {
-                entity: "BACKEND_PROJECT".to_string(),
+                entity: "HACKATHON_BI_2025".to_string(),
                 code: "1001".to_string(),
                 cause: "INVALID_EMAIL_OR_PASSWORD".to_string(),
             }]),
@@ -59,7 +59,7 @@ async fn register(
                     success: false,
                     data: None,
                     errors: Some(vec![ApiError {
-                        entity: "BACKEND_PROJECT".to_string(),
+                        entity: "HACKATHON_BI_2025".to_string(),
                         code: "1002".to_string(),
                         cause: "USER_ALREADY_EXISTS".to_string(),
                     }]),
@@ -72,7 +72,7 @@ async fn register(
                     success: false,
                     data: None,
                     errors: Some(vec![ApiError {
-                        entity: "BACKEND_PROJECT".to_string(),
+                        entity: "HACKATHON_BI_2025".to_string(),
                         code: "1000".to_string(),
                         cause: "SYSTEM_ERROR".to_string(),
                     }]),
@@ -101,7 +101,7 @@ async fn login(
             success: false,
             data: None,
             errors: Some(vec![ApiError {
-                entity: "BACKEND_PROJECT".to_string(),
+                entity: "HACKATHON_BI_2025".to_string(),
                 code: "1001".to_string(),
                 cause: "INVALID_EMAIL_OR_PASSWORD".to_string(),
             }]),
@@ -148,7 +148,7 @@ async fn login(
                     success: false,
                     data: None,
                     errors: Some(vec![ApiError {
-                        entity: "BACKEND_PROJECT".to_string(),
+                        entity: "HACKATHON_BI_2025".to_string(),
                         code: "1001".to_string(),
                         cause: "INVALID_EMAIL_OR_PASSWORD".to_string(),
                     }]),
@@ -161,7 +161,7 @@ async fn login(
                     success: false,
                     data: None,
                     errors: Some(vec![ApiError {
-                        entity: "BACKEND_PROJECT".to_string(),
+                        entity: "HACKATHON_BI_2025".to_string(),
                         code: "1000".to_string(),
                         cause: "SYSTEM_ERROR".to_string(),
                     }]),
