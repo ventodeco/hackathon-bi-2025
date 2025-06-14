@@ -47,6 +47,6 @@ impl MetricsService {
                 .join(",");
             metric_name = format!("{}#{}", metric_name, tag_string);
         }
-        self.client.timer(&metric_name, duration.as_millis() as f64);
+        self.client.histogram(&metric_name, duration.as_millis() as f64);
     }
 } 
