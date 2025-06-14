@@ -4,6 +4,7 @@ mod models;
 mod repositories;
 mod services;
 mod utils;
+mod submissions;
 
 use actix_web::{web, App, HttpServer};
 use dotenv::dotenv;
@@ -46,7 +47,8 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/v1")
                     .service(controllers::auth::register)
-                    .service(controllers::auth::login),
+                    .service(controllers::auth::login)
+                    .service(submissions::submission_controller::presigned_urls),
             )
     })
     .bind(format!("{}:{}", host, port))?
