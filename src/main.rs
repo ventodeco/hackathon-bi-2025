@@ -1,4 +1,10 @@
-mod config;
+use actix_web::{web, App, HttpServer};
+use std::env;
+use sqlx::postgres::PgPoolOptions;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use crate::services::metrics_service::MetricsService;
+
+mod commons;
 mod controllers;
 mod models;
 mod repositories;
@@ -6,15 +12,9 @@ mod services;
 mod utils;
 mod submissions;
 
-use actix_web::{web, App, HttpServer};
-use dotenv::dotenv;
-use sqlx::postgres::PgPoolOptions;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-use crate::services::metrics_service::MetricsService;
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    dotenv().ok();
+    dotenv::dotenv().ok();
     
     // Initialize tracing with JSON format
     tracing_subscriber::registry()
@@ -40,10 +40,18 @@ async fn main() -> std::io::Result<()> {
         &std::env::var("STATSD_PREFIX").expect("STATSD_PREFIX must be set")
     ));
 
+    let minio_service = commons::minio_service::MinioService::new(
+        &env::var("MINIO_ENDPOINT").expect("MINIO_ENDPOINT must be set"),
+        &env::var("MINIO_ACCESS_KEY").expect("MINIO_ACCESS_KEY must be set"),
+        &env::var("MINIO_SECRET_KEY").expect("MINIO_SECRET_KEY must be set"),
+        &env::var("MINIO_BUCKET_NAME").expect("MINIO_BUCKET_NAME must be set"),
+    ).await.expect("Failed to initialize MinIO service");
+
     HttpServer::new(move || {
         App::new()
             .app_data(pool.clone())
             .app_data(metrics_service.clone())
+            .app_data(web::Data::new(minio_service.clone()))
             .service(
                 web::scope("/v1")
                     .service(controllers::auth::register)

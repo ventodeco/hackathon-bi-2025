@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use statsd::Client;
+use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct MetricsService {
-    client: Client,
+    client: Arc<Client>,
 }
 
 impl MetricsService {
     pub fn new(host: &str, port: u16, prefix: &str) -> Self {
-        let client = Client::new(format!("{}:{}", host, port), prefix).unwrap();
+        let client = Arc::new(Client::new(format!("{}:{}", host, port), prefix).unwrap());
         Self { client }
     }
 
@@ -47,6 +49,6 @@ impl MetricsService {
                 .join(",");
             metric_name = format!("{}#{}", metric_name, tag_string);
         }
-        self.client.histogram(&metric_name, duration.as_millis() as f64);
+        self.client.timer(&metric_name, duration.as_millis() as f64);
     }
 } 
