@@ -7,8 +7,7 @@ use crate::{
     models::user::ApiError,
     services::metrics_service::MetricsService,
     submissions::{
-        dto::presigned_urls_response::{Document, PresignedUrlsResponse},
-        submission_repository::SubmissionRepository,
+        dto::presigned_urls_response::{Document, PresignedUrlsResponse, SubmissionData}, submission_controller::SubmissionType, submission_repository::SubmissionRepository
     },
 };
 
@@ -35,6 +34,7 @@ impl SubmissionService {
         &self,
         session_id: String,
         user_id: String,
+        submission_type: SubmissionType,
     ) -> Result<PresignedUrlsResponse, Vec<ApiError>> {
         let start = std::time::Instant::now();
         let mut tags = HashMap::new();
@@ -48,8 +48,9 @@ impl SubmissionService {
 
         // KTP document
         let ktp_uuid = Uuid::new_v4();
+        let ktp_filename = ktp_uuid.to_string() + "_KTP";
         let ktp_url = match self.minio_service
-            .generate_upload_url(ktp_uuid.to_string() + "_KTP", Duration::from_secs(600))
+            .generate_upload_url(ktp_filename.clone(), Duration::from_secs(600))
             .await
         {
             Ok(url) => url,
@@ -74,8 +75,9 @@ impl SubmissionService {
 
         // Selfie document
         let selfie_uuid = Uuid::new_v4();
+        let selfie_filename = selfie_uuid.to_string() + "_SELFIE";
         let selfie_url = match self.minio_service
-            .generate_upload_url(selfie_uuid.to_string() + "_SELFIE", Duration::from_secs(600))
+            .generate_upload_url(selfie_filename.clone(), Duration::from_secs(600))
             .await
         {
             Ok(url) => url,
@@ -103,16 +105,26 @@ impl SubmissionService {
             documents,
         };
 
+        let mut documents_data = HashMap::new();
+        documents_data.insert("KTP", SubmissionData {
+            document_name: ktp_filename.clone(),
+            document_reference: ktp_uuid.to_string(),
+        });
+        documents_data.insert("SELFIE", SubmissionData {
+            document_name: selfie_filename.clone(),
+            document_reference: selfie_uuid.to_string()
+        });
+
         // Save to database
         if let Err(e) = self
             .submission_repository
             .create(
                 submission_id,
-                "DOCUMENT_UPLOAD",
+                &submission_type.to_string(),
                 &session_id,
                 &user_id,
-                "PENDING",
-                json!(response),
+                "INITIATED",
+                json!(documents_data),
                 json!({}),
             )
             .await

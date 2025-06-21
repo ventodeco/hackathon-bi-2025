@@ -57,6 +57,11 @@ sqlx database create
 sqlx database drop
 ```
 
+# prepare the query that we use
+```
+cargo sqlx prepare
+```
+
 ## API Endpoints
 
 ### Register User

@@ -37,7 +37,7 @@ impl MinioService {
     }
 
     pub async fn generate_presigned_url(&self, file_name: String, expires_in: Duration) -> Result<String> {
-        let object_key = format!("{}.jpg", file_name);
+        let object_key = format!("{}", file_name);
         let presigned_config = PresigningConfig::builder()
             .expires_in(expires_in)
             .build()?;
@@ -58,7 +58,7 @@ impl MinioService {
     }
 
     pub async fn generate_upload_url(&self, file_name: String, expires_in: Duration) -> Result<String> {
-        let object_key = format!("{}.jpg", file_name);
+        let object_key = format!("{}", file_name);
         let presigned_config = PresigningConfig::builder()
             .expires_in(expires_in)
             .build()?;

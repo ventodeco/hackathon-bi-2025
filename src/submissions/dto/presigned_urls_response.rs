@@ -16,3 +16,10 @@ pub struct PresignedUrlsResponse {
     pub submission_id: String,
     pub documents: HashMap<String, Document>,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmissionData {
+    pub document_name: String,
+    pub document_reference: String,
+}
