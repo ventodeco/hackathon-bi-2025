@@ -20,6 +20,7 @@ impl SubmissionRepository {
         status: &str,
         submission_data: Value,
         request_data: Value,
+        nfc_identifier: &str,
     ) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"
@@ -30,9 +31,10 @@ impl SubmissionRepository {
                 user_id,
                 status,
                 submission_data,
-                request_data
+                request_data,
+                nfc_identifier
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             "#,
             submission_id,
             submission_type,
@@ -40,7 +42,8 @@ impl SubmissionRepository {
             user_id,
             status,
             submission_data as _,
-            request_data as _
+            request_data as _,
+            nfc_identifier
         )
         .execute(&self.pool)
         .await?;

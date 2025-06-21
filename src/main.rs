@@ -2,7 +2,7 @@ use actix_web::{web, App, HttpServer};
 use std::env;
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-use crate::services::metrics_service::MetricsService;
+use crate::services::{metrics_service::MetricsService, face_match_service::FaceMatchService};
 
 mod commons;
 mod controllers;
@@ -40,6 +40,13 @@ async fn main() -> std::io::Result<()> {
         &std::env::var("STATSD_PREFIX").expect("STATSD_PREFIX must be set")
     ));
 
+    let face_match_service = web::Data::new(FaceMatchService::new(
+        std::env::var("FACE_MATCH_HOST").expect("FACE_MATCH_HOST must be set"),
+        std::env::var("FACE_MATCH_THRESHOLD").expect("FACE_MATCH_THRESHOLD must be set").parse::<f64>().unwrap(),
+        std::env::var("FACE_MATCH_TIMEOUT_MILLIS").expect("FACE_MATCH_TIMEOUT_MILLIS must be set").parse::<u64>().unwrap(),
+        metrics_service.as_ref().clone(),
+    ));
+
     let minio_service = commons::minio_service::MinioService::new(
         &env::var("MINIO_ENDPOINT").expect("MINIO_ENDPOINT must be set"),
         &env::var("MINIO_ACCESS_KEY").expect("MINIO_ACCESS_KEY must be set"),
@@ -51,12 +58,14 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(pool.clone())
             .app_data(metrics_service.clone())
+            .app_data(face_match_service.clone())
             .app_data(web::Data::new(minio_service.clone()))
             .service(
                 web::scope("/v1")
                     .service(controllers::auth::register)
                     .service(controllers::auth::login)
-                    .service(submissions::submission_controller::presigned_urls),
+                    .service(submissions::submission_controller::presigned_urls)
+                    .service(submissions::submission_controller::face_match),
             )
     })
     .bind(format!("{}:{}", host, port))?

@@ -2,6 +2,7 @@ use aws_sdk_s3::{
     config::{Credentials, Region},
     Client,
     presigning::PresigningConfig,
+    primitives::ByteStream,
 };
 use std::time::Duration;
 use anyhow::Result;
@@ -76,5 +77,94 @@ impl MinioService {
         println!("Generated presigned URL: {}", presigned_request.uri());
 
         Ok(presigned_request.uri().to_string())
+    }
+
+    pub async fn upload_file(&self, file_name: String, content: Vec<u8>, content_type: Option<String>) -> Result<String> {
+        let object_key = format!("{}", file_name);
+        let byte_stream = ByteStream::from(content);
+
+        let mut put_object = self
+            .client
+            .put_object()
+            .bucket(&self.bucket_name)
+            .key(&object_key)
+            .body(byte_stream);
+
+        // Set content type if provided
+        if let Some(ct) = content_type {
+            put_object = put_object.content_type(ct);
+        }
+
+        put_object.send().await?;
+
+        // Generate a view URL for the uploaded file
+        let view_url = self.generate_view_url(object_key).await?;
+        
+        Ok(view_url)
+    }
+
+    pub async fn upload_file_with_metadata(
+        &self, 
+        file_name: String, 
+        content: Vec<u8>, 
+        content_type: Option<String>,
+        metadata: std::collections::HashMap<String, String>
+    ) -> Result<String> {
+        let object_key = format!("{}", file_name);
+        let byte_stream = ByteStream::from(content);
+
+        let mut put_object = self
+            .client
+            .put_object()
+            .bucket(&self.bucket_name)
+            .key(&object_key)
+            .body(byte_stream);
+
+        // Set content type if provided
+        if let Some(ct) = content_type {
+            put_object = put_object.content_type(ct);
+        }
+
+        // Add metadata
+        for (key, value) in metadata {
+            put_object = put_object.metadata(key, value);
+        }
+
+        put_object.send().await?;
+
+        // Generate a view URL for the uploaded file
+        let view_url = self.generate_view_url(object_key).await?;
+        
+        Ok(view_url)
+    }
+
+    pub async fn delete_file(&self, file_name: String) -> Result<()> {
+        let object_key = format!("{}", file_name);
+        
+        self
+            .client
+            .delete_object()
+            .bucket(&self.bucket_name)
+            .key(object_key)
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn file_exists(&self, file_name: String) -> Result<bool> {
+        let object_key = format!("{}", file_name);
+        
+        match self
+            .client
+            .head_object()
+            .bucket(&self.bucket_name)
+            .key(object_key)
+            .send()
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(_) => Ok(false),
+        }
     }
 }

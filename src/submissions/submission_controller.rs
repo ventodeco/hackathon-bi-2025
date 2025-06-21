@@ -1,11 +1,11 @@
-use actix_web::{web, HttpResponse, error::QueryPayloadError};
+use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
     commons::minio_service::MinioService,
     models::user::{ApiResponse, ApiError},
-    services::metrics_service::MetricsService,
+    services::{metrics_service::MetricsService, face_match_service::FaceMatchService},
     submissions::{
         submission_repository::SubmissionRepository,
         submission_service::SubmissionService,
@@ -14,8 +14,17 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PresignedUrlsQuery {
+pub struct PresignedUrlsBody {
     pub submission_type: SubmissionType,
+    pub nfc_identifier: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FaceMatchBody {
+    pub image1_url: String,
+    pub image2_url: String,
+    pub submission_id: String,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -31,15 +40,15 @@ impl std::fmt::Display for SubmissionType {
     }
 }
 
-#[actix_web::get("/submissions/urls")]
+#[actix_web::post("/submissions/urls")]
 async fn presigned_urls(
     pool: web::Data<sqlx::PgPool>,
     minio_service: web::Data<MinioService>,
     metrics: web::Data<MetricsService>,
-    query: Result<web::Query<PresignedUrlsQuery>, actix_web::Error>,
+    body: Result<web::Json<PresignedUrlsBody>, actix_web::Error>,
 ) -> HttpResponse {
-    let query = match query {
-        Ok(q) => q,
+    let body = match body {
+        Ok(b) => b,
         Err(e) => {
             return HttpResponse::BadRequest().json(ApiResponse::<()> {
                 success: false,
@@ -47,7 +56,7 @@ async fn presigned_urls(
                 errors: Some(vec![ApiError {
                     entity: "HACKATHON_BI_2025".to_string(),
                     code: "1003".to_string(),
-                    cause: format!("INVALID_QUERY_PARAMETERS: {}", e),
+                    cause: format!("INVALID_REQUEST_BODY: {}", e),
                 }]),
             });
         }
@@ -67,7 +76,8 @@ async fn presigned_urls(
         .generate_presigned_urls(
             session_id,
             user_id,
-            query.submission_type.clone(),
+            body.submission_type.clone(),
+            body.nfc_identifier.clone(),
         )
         .await
     {
@@ -80,6 +90,51 @@ async fn presigned_urls(
             success: false,
             data: None,
             errors: Some(errors),
+        }),
+    }
+}
+
+#[actix_web::post("/submissions/face-match")]
+async fn face_match(
+    face_match_service: web::Data<FaceMatchService>,
+    body: Result<web::Json<FaceMatchBody>, actix_web::Error>,
+) -> HttpResponse {
+    let body = match body {
+        Ok(b) => b,
+        Err(e) => {
+            return HttpResponse::BadRequest().json(ApiResponse::<()> {
+                success: false,
+                data: None,
+                errors: Some(vec![ApiError {
+                    entity: "HACKATHON_BI_2025".to_string(),
+                    code: "1003".to_string(),
+                    cause: format!("INVALID_REQUEST_BODY: {}", e),
+                }]),
+            });
+        }
+    };
+
+    match face_match_service
+        .compare_faces(
+            body.image1_url.clone(),
+            body.image2_url.clone(),
+            body.submission_id.clone(),
+        )
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(ApiResponse {
+            success: true,
+            data: Some(response),
+            errors: None,
+        }),
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<()> {
+            success: false,
+            data: None,
+            errors: Some(vec![ApiError {
+                entity: "HACKATHON_BI_2025".to_string(),
+                code: "1006".to_string(),
+                cause: e.to_string(),
+            }]),
         }),
     }
 }

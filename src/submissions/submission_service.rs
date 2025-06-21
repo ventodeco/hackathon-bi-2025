@@ -1,9 +1,10 @@
 use std::{collections::HashMap, time::Duration};
 use uuid::Uuid;
 use serde_json::json;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 use crate::{
-    commons::minio_service::MinioService,
+    commons::minio_service::{self, MinioService},
     models::user::ApiError,
     services::metrics_service::MetricsService,
     submissions::{
@@ -35,6 +36,7 @@ impl SubmissionService {
         session_id: String,
         user_id: String,
         submission_type: SubmissionType,
+        nfc_identifier: String,
     ) -> Result<PresignedUrlsResponse, Vec<ApiError>> {
         let start = std::time::Instant::now();
         let mut tags = HashMap::new();
@@ -105,6 +107,13 @@ impl SubmissionService {
             documents,
         };
 
+        // TODO: nfc_identifier is base64 of the image, i want to upload to minio
+        let nfc_identifier_clean = nfc_identifier.replace("data:image/jpeg;base64,", "").replace("data:image/png;base64,", "");
+        let nfc_identifier_base64 = STANDARD.decode(&nfc_identifier_clean).unwrap();
+        let nfc_uuid = Uuid::new_v4();
+        let nfc_identifier_filename = nfc_uuid.to_string() + "_NFC";
+        self.minio_service.upload_file(nfc_identifier_filename.clone(), nfc_identifier_base64, Some("image/jpeg".to_string())).await.unwrap();
+
         let mut documents_data = HashMap::new();
         documents_data.insert("KTP", SubmissionData {
             document_name: ktp_filename.clone(),
@@ -114,18 +123,23 @@ impl SubmissionService {
             document_name: selfie_filename.clone(),
             document_reference: selfie_uuid.to_string()
         });
+        documents_data.insert("NFC", SubmissionData {
+            document_name: nfc_identifier_filename.clone(),
+            document_reference: nfc_uuid.to_string(),
+        });
 
         // Save to database
         if let Err(e) = self
             .submission_repository
             .create(
                 submission_id,
-                &submission_type.to_string(),
+                &format!("{:?}", submission_type),
                 &session_id,
                 &user_id,
-                "INITIATED",
+                "INITAITED",
                 json!(documents_data),
                 json!({}),
+                &nfc_identifier[..200],
             )
             .await
         {
