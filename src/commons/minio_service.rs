@@ -17,7 +17,7 @@ impl MinioService {
     pub async fn new(endpoint: &str, access_key: &str, secret_key: &str, bucket_name: &str) -> Result<Self> {
         // Ensure endpoint doesn't end with slash
         let endpoint = endpoint.trim_end_matches('/');
-        
+
         println!("Initializing MinIO service with endpoint: {}", endpoint);
         println!("Bucket name: {}", bucket_name);
         
