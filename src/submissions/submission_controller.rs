@@ -27,6 +27,18 @@ pub struct FaceMatchBody {
     pub submission_id: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessSubmissionBody {
+    pub submission_id: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessSubmissionResponse {
+    pub submission_status: String,
+}
+
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub enum SubmissionType {
     KYC
@@ -136,5 +148,62 @@ async fn face_match(
                 cause: e.to_string(),
             }]),
         }),
+    }
+}
+
+#[actix_web::put("/submissions/urls")]
+async fn process_submission(
+    pool: web::Data<sqlx::PgPool>,
+    minio_service: web::Data<MinioService>,
+    face_match_service: web::Data<FaceMatchService>,
+    metrics: web::Data<MetricsService>,
+    body: Result<web::Json<ProcessSubmissionBody>, actix_web::Error>,
+) -> HttpResponse {
+    let body = match body {
+        Ok(b) => b,
+        Err(e) => {
+            return HttpResponse::BadRequest().json(ApiResponse::<()> {
+                success: false,
+                data: None,
+                errors: Some(vec![ApiError {
+                    entity: "HACKATHON_BI_2025".to_string(),
+                    code: "1003".to_string(),
+                    cause: format!("INVALID_REQUEST_BODY: {}", e),
+                }]),
+            });
+        }
+    };
+
+    let submission_service = SubmissionService::new(
+        minio_service.as_ref().clone(),
+        SubmissionRepository::new(pool.as_ref().clone()),
+        metrics.as_ref().clone()
+    );
+
+    match submission_service
+        .process_submission(
+            body.submission_id.clone(),
+            face_match_service.as_ref().clone()
+        )
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(ApiResponse {
+            success: true,
+            data: Some(response),
+            errors: None,
+        }),
+        Err(errors) => {
+            let status_code = if errors.iter().any(|e| e.code == "1004") {
+                HttpResponse::UnprocessableEntity
+            } else {
+                HttpResponse::InternalServerError
+            };
+            
+            status_code().json(ApiResponse::<()> {
+                success: false,
+                data: None,
+                errors: Some(errors),
+            })
+        }
     }
 }

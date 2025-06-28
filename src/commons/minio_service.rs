@@ -15,6 +15,12 @@ pub struct MinioService {
 
 impl MinioService {
     pub async fn new(endpoint: &str, access_key: &str, secret_key: &str, bucket_name: &str) -> Result<Self> {
+        // Ensure endpoint doesn't end with slash
+        let endpoint = endpoint.trim_end_matches('/');
+        
+        println!("Initializing MinIO service with endpoint: {}", endpoint);
+        println!("Bucket name: {}", bucket_name);
+        
         let config = aws_sdk_s3::config::Builder::new()
             .endpoint_url(endpoint)
             .region(Region::new("us-east-1"))
@@ -30,6 +36,12 @@ impl MinioService {
             .build();
 
         let client = Client::from_conf(config);
+
+        // Test the connection by listing buckets
+        match client.list_buckets().send().await {
+            Ok(_) => println!("MinIO connection successful"),
+            Err(e) => println!("MinIO connection test failed: {:?}", e),
+        }
 
         Ok(Self {
             client,
@@ -47,7 +59,7 @@ impl MinioService {
             .client
             .get_object()
             .bucket(&self.bucket_name)
-            .key(object_key)
+            .key(&object_key)
             .presigned(presigned_config)
             .await?;
 
@@ -55,7 +67,23 @@ impl MinioService {
     }
 
     pub async fn generate_view_url(&self, file_name: String) -> Result<String> {
-        self.generate_presigned_url(file_name, Duration::from_secs(3600)).await
+        let presigned_config = PresigningConfig::builder()
+            .expires_in(Duration::from_secs(3600))
+            .build()?;
+    
+        let presigned_request = self
+            .client
+            .get_object()
+            .bucket(&self.bucket_name)
+            .key(&file_name)
+            .response_content_type("image/jpg")
+            .presigned(presigned_config)
+            .await?;
+
+        let url = presigned_request.uri().to_string();
+        log::info!("Generated view URL: {}", url);
+        
+        Ok(url)
     }
 
     pub async fn generate_upload_url(&self, file_name: String, expires_in: Duration) -> Result<String> {
@@ -68,7 +96,7 @@ impl MinioService {
             .client
             .put_object()
             .bucket(&self.bucket_name)
-            .key(object_key)
+            .key(&object_key)
             .content_type("image/jpeg")
             .presigned(presigned_config)
             .await?;
@@ -98,7 +126,7 @@ impl MinioService {
         put_object.send().await?;
 
         // Generate a view URL for the uploaded file
-        let view_url = self.generate_view_url(object_key).await?;
+        let view_url = self.generate_view_url(file_name).await?;
         
         Ok(view_url)
     }
@@ -133,7 +161,7 @@ impl MinioService {
         put_object.send().await?;
 
         // Generate a view URL for the uploaded file
-        let view_url = self.generate_view_url(object_key).await?;
+        let view_url = self.generate_view_url(file_name).await?;
         
         Ok(view_url)
     }
@@ -145,7 +173,7 @@ impl MinioService {
             .client
             .delete_object()
             .bucket(&self.bucket_name)
-            .key(object_key)
+            .key(&object_key)
             .send()
             .await?;
 
@@ -159,7 +187,7 @@ impl MinioService {
             .client
             .head_object()
             .bucket(&self.bucket_name)
-            .key(object_key)
+            .key(&object_key)
             .send()
             .await
         {

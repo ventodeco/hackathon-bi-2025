@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE submissions\n            SET status = $2, updated_at = NOW()\n            WHERE submission_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "93bac82f1c567f71a5731690e208ec7ed8da8892407fdee6933cfef6445a8a31"
+}

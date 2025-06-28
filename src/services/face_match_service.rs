@@ -20,6 +20,7 @@ pub struct FaceMatchResponse {
     pub threshold: f64,
 }
 
+#[derive(Clone)]
 pub struct FaceMatchService {
     client: reqwest::Client,
     base_url: String,

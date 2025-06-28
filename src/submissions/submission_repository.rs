@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 use uuid::Uuid;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 pub struct SubmissionRepository {
     pool: PgPool,
@@ -20,7 +20,6 @@ impl SubmissionRepository {
         status: &str,
         submission_data: Value,
         request_data: Value,
-        nfc_identifier: &str,
     ) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"
@@ -31,10 +30,9 @@ impl SubmissionRepository {
                 user_id,
                 status,
                 submission_data,
-                request_data,
-                nfc_identifier
+                request_data
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             "#,
             submission_id,
             submission_type,
@@ -42,8 +40,7 @@ impl SubmissionRepository {
             user_id,
             status,
             submission_data as _,
-            request_data as _,
-            nfc_identifier
+            request_data as _
         )
         .execute(&self.pool)
         .await?;
@@ -64,5 +61,46 @@ impl SubmissionRepository {
         .await?;
 
         Ok(result.and_then(|r| r.submission_data.and_then(|s| serde_json::from_str(&s).ok())))
+    }
+
+    pub async fn find_submission_by_id(&self, submission_id: &str) -> Result<Option<(String, Value)>, sqlx::Error> {
+        let submission_uuid = Uuid::parse_str(submission_id).map_err(|_| sqlx::Error::RowNotFound)?;
+        
+        let result = sqlx::query!(
+            r#"
+            SELECT status, submission_data
+            FROM submissions
+            WHERE submission_id = $1
+            "#,
+            submission_uuid
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.map(|r| {
+            let status = r.status;
+            let data = r.submission_data
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or(json!({}));
+            (status, data)
+        }))
+    }
+
+    pub async fn update_submission_status(&self, submission_id: &str, status: &str) -> Result<(), sqlx::Error> {
+        let submission_uuid = Uuid::parse_str(submission_id).map_err(|_| sqlx::Error::RowNotFound)?;
+        
+        sqlx::query!(
+            r#"
+            UPDATE submissions
+            SET status = $2, updated_at = NOW()
+            WHERE submission_id = $1
+            "#,
+            submission_uuid,
+            status
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 }

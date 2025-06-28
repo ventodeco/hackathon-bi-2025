@@ -65,7 +65,8 @@ async fn main() -> std::io::Result<()> {
                     .service(controllers::auth::register)
                     .service(controllers::auth::login)
                     .service(submissions::submission_controller::presigned_urls)
-                    .service(submissions::submission_controller::face_match),
+                    .service(submissions::submission_controller::face_match)
+                    .service(submissions::submission_controller::process_submission),
             )
     })
     .bind(format!("{}:{}", host, port))?
