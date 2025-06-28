@@ -10,8 +10,8 @@ WORKDIR /app
 COPY . .
 
 # Build your hackathon-bi-2025
-# Ensure musl-tools are installed for static linking
-RUN apt-get update && apt-get install -y musl-tools \
+# Install musl-tools for static linking
+RUN apt-get update && apt-get install -y --no-install-recommends musl-tools \
     && rustup target add x86_64-unknown-linux-musl \
     && SQLX_OFFLINE=true cargo build --release --target x86_64-unknown-linux-musl
 
