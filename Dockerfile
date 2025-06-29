@@ -16,13 +16,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends musl-tools \
     && SQLX_OFFLINE=true cargo build --release --target x86_64-unknown-linux-musl
 
 # Stage 2: Create the final minimal image
-FROM scratch
+FROM alpine:latest
+
+# Install CA certificates
+RUN apk add --no-cache ca-certificates
 
 # Copy the statically linked binary from the builder stage
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/hackathon-bi-2025 /
 
 # Expose the port your application listens on
 EXPOSE 8080
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Define the command to run your application
 CMD ["./hackathon-bi-2025"]
