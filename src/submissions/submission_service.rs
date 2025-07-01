@@ -78,7 +78,7 @@ impl SubmissionService {
         );
 
         // Selfie document
-        let selfie_uuid = Uuid::new_v4();
+        let selfie_uuid: Uuid = Uuid::new_v4();
         let selfie_filename = selfie_uuid.to_string() + "_SELFIE";
         let selfie_url = match self.minio_service
             .generate_upload_url(selfie_filename.clone(), Duration::from_secs(600))
@@ -110,7 +110,7 @@ impl SubmissionService {
         };
 
         // TODO: nfc_identifier is base64 of the image, i want to upload to minio
-        let nfc_identifier_clean = nfc_identifier.replace("data:image/jpeg;base64,", "").replace("data:image/png;base64,", "");
+        let nfc_identifier_clean = nfc_identifier.replace("data:image/jpeg;base64,", "");
         let nfc_identifier_base64 = STANDARD.decode(&nfc_identifier_clean).unwrap();
         let nfc_uuid = Uuid::new_v4();
         let nfc_identifier_filename = nfc_uuid.to_string() + "_NFC";
@@ -141,6 +141,7 @@ impl SubmissionService {
                 "INITAITED",
                 json!(documents_data),
                 json!({}),
+                &nfc_identifier_clean.chars().take(500).collect::<String>(),
             )
             .await
         {

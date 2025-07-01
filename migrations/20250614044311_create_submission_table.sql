@@ -14,6 +14,5 @@ CREATE TABLE IF NOT EXISTS submissions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT unique__submission_id UNIQUE (submission_id),
-    CONSTRAINT unique__session_id UNIQUE (session_id),
-    CONSTRAINT unique__nfc_identifier UNIQUE (nfc_identifier)
+    CONSTRAINT unique__session_id UNIQUE (session_id)
 );
