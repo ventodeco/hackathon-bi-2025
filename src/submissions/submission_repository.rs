@@ -20,7 +20,7 @@ impl SubmissionRepository {
         status: &str,
         submission_data: Value,
         request_data: Value,
-        nfc_identifier: &str,
+        nfc_identifier: String,
     ) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"

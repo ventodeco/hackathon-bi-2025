@@ -54,13 +54,15 @@ pub struct GetSubmissionStatusResponse {
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub enum SubmissionType {
-    KYC
+    KYC,
+    ON_DEMAND,
 }
 
 impl std::fmt::Display for SubmissionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SubmissionType::KYC => write!(f, "KYC"),
+            SubmissionType::ON_DEMAND => write!(f, "ON_DEMAND"),
         }
     }
 }

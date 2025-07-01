@@ -43,6 +43,7 @@ impl SubmissionService {
         let start = std::time::Instant::now();
         let mut tags = HashMap::new();
         tags.insert("endpoint".to_string(), "presigned_urls".to_string());
+        tags.insert("submission_type".to_string(), submission_type.to_string());
 
         // Generate a new submission ID
         let submission_id = Uuid::new_v4();
@@ -50,32 +51,41 @@ impl SubmissionService {
         // Generate document references and presigned URLs
         let mut documents = HashMap::new();
 
-        // KTP document
-        let ktp_uuid = Uuid::new_v4();
-        let ktp_filename = ktp_uuid.to_string() + "_KTP";
-        let ktp_url = match self.minio_service
-            .generate_upload_url(ktp_filename.clone(), Duration::from_secs(600))
-            .await
-        {
-            Ok(url) => url,
-            Err(e) => {
-                self.metrics.increment("api_error", Some(tags.clone()));
-                return Err(vec![ApiError {
-                    entity: "HACKATHON_BI_2025".to_string(),
-                    code: "1001".to_string(),
-                    cause: e.to_string(),
-                }]);
-            }
-        };
+        let mut documents_data = HashMap::new();
 
-        documents.insert(
-            "KTP".to_string(),
-            Document {
-                document_url: ktp_url,
+        // KYC document
+        if submission_type.to_string() == "KYC" {
+            let ktp_uuid = Uuid::new_v4();
+            let ktp_filename = ktp_uuid.to_string() + "_KTP";
+            let ktp_url = match self.minio_service
+                .generate_upload_url(ktp_filename.clone(), Duration::from_secs(600))
+                .await
+            {
+                Ok(url) => url,
+                Err(e) => {
+                    self.metrics.increment("api_error", Some(tags.clone()));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1001".to_string(),
+                        cause: e.to_string(),
+                    }]);
+                }
+            };
+
+            documents.insert(
+                "KTP".to_string(),
+                Document {
+                    document_url: ktp_url,
+                    document_reference: ktp_uuid.to_string(),
+                    expiry_in_seconds: "600".to_string(),
+                },
+            );
+
+            documents_data.insert("KTP", SubmissionData {
+                document_name: ktp_filename.clone(),
                 document_reference: ktp_uuid.to_string(),
-                expiry_in_seconds: "600".to_string(),
-            },
-        );
+            });
+        }
 
         // Selfie document
         let selfie_uuid: Uuid = Uuid::new_v4();
@@ -103,32 +113,26 @@ impl SubmissionService {
                 expiry_in_seconds: "600".to_string(),
             },
         );
+        documents_data.insert("SELFIE", SubmissionData {
+            document_name: selfie_filename.clone(),
+            document_reference: selfie_uuid.to_string()
+        });
 
-        let response = PresignedUrlsResponse {
-            submission_id: submission_id.to_string(),
-            documents,
-        };
-
-        // TODO: nfc_identifier is base64 of the image, i want to upload to minio
+        // NFC document
         let nfc_identifier_clean = nfc_identifier.replace("data:image/jpeg;base64,", "");
         let nfc_identifier_base64 = STANDARD.decode(&nfc_identifier_clean).unwrap();
         let nfc_uuid = Uuid::new_v4();
         let nfc_identifier_filename = nfc_uuid.to_string() + "_NFC";
         self.minio_service.upload_file(nfc_identifier_filename.clone(), nfc_identifier_base64, Some("image/jpeg".to_string())).await.unwrap();
-
-        let mut documents_data = HashMap::new();
-        documents_data.insert("KTP", SubmissionData {
-            document_name: ktp_filename.clone(),
-            document_reference: ktp_uuid.to_string(),
-        });
-        documents_data.insert("SELFIE", SubmissionData {
-            document_name: selfie_filename.clone(),
-            document_reference: selfie_uuid.to_string()
-        });
         documents_data.insert("NFC", SubmissionData {
             document_name: nfc_identifier_filename.clone(),
             document_reference: nfc_uuid.to_string(),
         });
+
+        let response = PresignedUrlsResponse {
+            submission_id: submission_id.to_string(),
+            documents,
+        };
 
         // Save to database
         if let Err(e) = self
@@ -138,10 +142,10 @@ impl SubmissionService {
                 &format!("{:?}", submission_type),
                 &session_id,
                 &user_id,
-                "INITAITED",
+                "INITIATED",
                 json!(documents_data),
                 json!({}),
-                &nfc_identifier_clean.chars().take(500).collect::<String>(),
+                nfc_identifier_clean.chars().take(500).collect::<String>(),
             )
             .await
         {
