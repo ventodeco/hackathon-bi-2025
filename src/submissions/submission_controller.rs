@@ -33,9 +33,22 @@ pub struct ProcessSubmissionBody {
     pub submission_id: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetSubmissionStatusQuery {
+    pub submission_type: String,
+    pub nfc_identifier: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessSubmissionResponse {
+    pub submission_status: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetSubmissionStatusResponse {
     pub submission_status: String,
 }
 
@@ -200,6 +213,51 @@ async fn process_submission(
             };
             
             status_code().json(ApiResponse::<()> {
+                success: false,
+                data: None,
+                errors: Some(errors),
+            })
+        }
+    }
+}
+
+#[actix_web::get("/submissions/status")]
+async fn get_submission_status(
+    pool: web::Data<sqlx::PgPool>,
+    minio_service: web::Data<MinioService>,
+    metrics: web::Data<MetricsService>,
+    query: web::Query<GetSubmissionStatusQuery>,
+) -> HttpResponse {
+
+    let submission_type = match query.submission_type.as_str() {
+        "KYC" => SubmissionType::KYC,
+        _ => return HttpResponse::BadRequest().json(ApiResponse::<()> {
+            success: false,
+            data: None,
+            errors: Some(vec![ApiError {
+                entity: "HACKATHON_BI_2025".to_string(),
+                code: "1003".to_string(),
+                cause: "INVALID_SUBMISSION_TYPE".to_string(),
+            }]),
+        }),
+    };
+
+    let nfc_identifier = query.nfc_identifier.clone();
+
+    let submission_service = SubmissionService::new(
+        minio_service.as_ref().clone(),
+        SubmissionRepository::new(pool.as_ref().clone()),
+        metrics.as_ref().clone()
+    );
+
+    match submission_service.get_submission_status(submission_type, nfc_identifier).await {
+        Ok(response) => HttpResponse::Ok().json(ApiResponse {
+            success: true,
+            data: Some(response),
+            errors: None,
+        }),
+        Err(errors) => {
+            HttpResponse::InternalServerError().json(ApiResponse::<()> {
                 success: false,
                 data: None,
                 errors: Some(errors),

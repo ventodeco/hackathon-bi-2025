@@ -106,4 +106,22 @@ impl SubmissionRepository {
 
         Ok(())
     }
+
+    pub async fn find_submission_by_nfc_identifier_and_submission_type(&self, submission_type: &str, nfc_identifier: &str) -> Result<Option<String>, sqlx::Error> {
+        
+        let result = sqlx::query!(
+            r#"
+            SELECT status
+            FROM submissions
+            WHERE submission_type = $1 AND nfc_identifier = $2
+            order by id desc limit 1
+            "#,
+            submission_type,
+            nfc_identifier
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.map(|r| r.status))
+    }
 }

@@ -6,10 +6,10 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use crate::{
     commons::minio_service::{self, MinioService},
     models::user::ApiError,
-    services::{metrics_service::MetricsService, face_match_service::FaceMatchService},
+    services::{face_match_service::FaceMatchService, metrics_service::MetricsService},
     submissions::{
         dto::presigned_urls_response::{Document, PresignedUrlsResponse, SubmissionData}, 
-        submission_controller::{SubmissionType, ProcessSubmissionResponse}, 
+        submission_controller::{GetSubmissionStatusResponse, ProcessSubmissionResponse, SubmissionType}, 
         submission_repository::SubmissionRepository
     },
 };
@@ -342,4 +342,38 @@ impl SubmissionService {
 
         Ok(response)
     }
+
+    pub async fn get_submission_status(
+        &self,
+        submission_type: SubmissionType,
+        nfc_identifier: String,
+    ) -> Result<GetSubmissionStatusResponse, Vec<ApiError>> {
+        let submission_data= match self.submission_repository.find_submission_by_nfc_identifier_and_submission_type(&submission_type.to_string(), &nfc_identifier.chars().take(500).collect::<String>()).await {
+            Ok(Some(status)) => status,
+            Ok(None) => {
+                return Err(vec![ApiError {
+                    entity: "HACKATHON_BI_2025".to_string(),
+                    code: "1004".to_string(),
+                    cause: "SUBMISSION_NOT_FOUND".to_string(),
+                }]);
+            }
+            Err(e) => {
+                return Err(vec![ApiError {
+                    entity: "HACKATHON_BI_2025".to_string(),
+                    code: "1002".to_string(),
+                    cause: e.to_string(),
+                }]);
+            }
+        };
+
+        let mut status: String = String::from("NOT_KYC");
+        if submission_data == "APPROVED" {
+            status = String::from("KYC");
+        }
+
+        return Ok(GetSubmissionStatusResponse {
+            submission_status: status,
+        });
+    }
+
 }
