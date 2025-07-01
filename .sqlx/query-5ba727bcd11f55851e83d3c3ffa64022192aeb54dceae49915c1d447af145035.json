@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT submission_data, submission_type, nfc_identifier\n            FROM submissions\n            WHERE submission_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "submission_data",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "submission_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "nfc_identifier",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "5ba727bcd11f55851e83d3c3ffa64022192aeb54dceae49915c1d447af145035"
+}
