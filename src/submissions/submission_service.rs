@@ -173,8 +173,8 @@ impl SubmissionService {
         tags.insert("endpoint".to_string(), "process_submission".to_string());
 
         // 1. Check if submission exists in database
-        let submission_data = match self.submission_repository.find_submission_by_id(&submission_id).await {
-            Ok(Some((status, data))) => (status, data),
+        let (submission_type, nfc_identifier, submission_data) = match self.submission_repository.find_submission_by_id(&submission_id).await {
+            Ok(Some((submission_type, nfc_identifier, data))) => (submission_type, nfc_identifier, data),
             Ok(None) => {
                 self.metrics.increment("process_submission.error", Some(tags.clone()));
                 self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
@@ -195,8 +195,12 @@ impl SubmissionService {
             }
         };
 
+
+        let mut image_url_1 = String::new();
+        let mut image_url_2 = String::new();
+
         // 2. Extract document names from submission data
-        let documents_data = match submission_data.1.as_object() {
+        let documents_data = match submission_data.as_object() {
             Some(obj) => obj,
             None => {
                 self.metrics.increment("process_submission.error", Some(tags.clone()));
@@ -247,33 +251,6 @@ impl SubmissionService {
             }]);
         }
 
-        // 5. Get NFC document name
-        let nfc_doc = match documents_data.get("NFC") {
-            Some(doc) => doc,
-            None => {
-                self.metrics.increment("process_submission.error", Some(tags.clone()));
-                self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
-                return Err(vec![ApiError {
-                    entity: "HACKATHON_BI_2025".to_string(),
-                    code: "1004".to_string(),
-                    cause: "NFC_DOES_NOT_EXIST".to_string(),
-                }]);
-            }
-        };
-
-        let nfc_filename = match nfc_doc.get("documentName") {
-            Some(name) => name.as_str().unwrap_or(""),
-            None => {
-                self.metrics.increment("process_submission.error", Some(tags.clone()));
-                self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
-                return Err(vec![ApiError {
-                    entity: "HACKATHON_BI_2025".to_string(),
-                    code: "1004".to_string(),
-                    cause: "NFC_DOES_NOT_EXIST".to_string(),
-                }]);
-            }
-        };
-
         // 6. Generate URLs for face matching
         let selfie_url = match self.minio_service.generate_view_url(selfie_filename.to_string()).await {
             Ok(url) => url,
@@ -290,25 +267,161 @@ impl SubmissionService {
 
         log::info!("selfie_url: {:?}", selfie_url);
 
-        let nfc_url = match self.minio_service.generate_view_url(nfc_filename.to_string()).await {
-            Ok(url) => url,
-            Err(e) => {
+        if submission_type == "KYC" {
+
+            // 5. Get NFC document name
+            let nfc_doc = match documents_data.get("NFC") {
+                Some(doc) => doc,
+                None => {
+                    self.metrics.increment("process_submission.error", Some(tags.clone()));
+                    self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1004".to_string(),
+                        cause: "NFC_DOES_NOT_EXIST".to_string(),
+                    }]);
+                }
+            };
+
+            let nfc_filename = match nfc_doc.get("documentName") {
+                Some(name) => name.as_str().unwrap_or(""),
+                None => {
+                    self.metrics.increment("process_submission.error", Some(tags.clone()));
+                    self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1004".to_string(),
+                        cause: "NFC_DOES_NOT_EXIST".to_string(),
+                    }]);
+                }
+            };
+
+            let nfc_url = match self.minio_service.generate_view_url(nfc_filename.to_string()).await {
+                Ok(url) => url,
+                Err(e) => {
+                    self.metrics.increment("process_submission.error", Some(tags.clone()));
+                    self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1001".to_string(),
+                        cause: e.to_string(),
+                    }]);
+                }
+            };
+
+            log::info!("nfc_url: {:?}", nfc_url);
+
+            image_url_1 = nfc_url;
+            image_url_2 = selfie_url;
+
+        } else if submission_type == "ON_DEMAND" {
+
+            // 1. Check if submission exists in database
+            let submission_data_existing = match self.submission_repository.find_submission_by_nfc_identifier_and_status(&nfc_identifier, "APPROVED").await {
+                Ok(Some(submission_data_existing)) => submission_data_existing,
+                Ok(None) => {
+                    self.metrics.increment("process_submission.error", Some(tags.clone()));
+                    self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1004".to_string(),
+                        cause: "SUBMISSION_NOT_FOUND".to_string(),
+                    }]);
+                }
+                Err(e) => {
+                    self.metrics.increment("process_submission.error", Some(tags.clone()));
+                    self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1002".to_string(),
+                        cause: e.to_string(),
+                    }]);
+                }
+            };
+
+            // 2. Extract document names from submission data
+            let documents_data_existing = match submission_data_existing.as_object() {
+                Some(obj) => obj,
+                None => {
+                    self.metrics.increment("process_submission.error", Some(tags.clone()));
+                    self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1004".to_string(),
+                        cause: "INVALID_SUBMISSION_DATA".to_string(),
+                    }]);
+                }
+            };
+
+            // 3. Get selfie document name
+            let selfie_doc_existing = match documents_data_existing.get("SELFIE") {
+                Some(doc) => doc,
+                None => {
+                    self.metrics.increment("process_submission.error", Some(tags.clone()));
+                    self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1004".to_string(),
+                        cause: "SELFIE_DOES_NOT_EXIST".to_string(),
+                    }]);
+                }
+            };
+
+            let selfie_filename_existing = match selfie_doc_existing.get("documentName") {
+                Some(name) => name.as_str().unwrap_or(""),
+                None => {
+                    self.metrics.increment("process_submission.error", Some(tags.clone()));
+                    self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1004".to_string(),
+                        cause: "SELFIE_DOES_NOT_EXIST".to_string(),
+                    }]);
+                }
+            };
+
+            // 4. Check if selfie exists in MinIO
+            if !self.minio_service.file_exists(selfie_filename_existing.to_string()).await.unwrap_or(false) {
                 self.metrics.increment("process_submission.error", Some(tags.clone()));
                 self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
                 return Err(vec![ApiError {
                     entity: "HACKATHON_BI_2025".to_string(),
-                    code: "1001".to_string(),
-                    cause: e.to_string(),
+                    code: "1004".to_string(),
+                    cause: "SELFIE_DOES_NOT_EXIST".to_string(),
                 }]);
             }
-        };
 
-        log::info!("nfc_url: {:?}", nfc_url);
+            // 6. Generate URLs for face matching
+            let selfie_url_existing = match self.minio_service.generate_view_url(selfie_filename_existing.to_string()).await {
+                Ok(url) => url,
+                Err(e) => {
+                    self.metrics.increment("process_submission.error", Some(tags.clone()));
+                    self.metrics.timing("process_submission.duration", start.elapsed(), Some(tags));
+                    return Err(vec![ApiError {
+                        entity: "HACKATHON_BI_2025".to_string(),
+                        code: "1001".to_string(),
+                        cause: e.to_string(),
+                    }]);
+                }
+            };
+
+            log::info!("selfie_url_existing: {:?}", selfie_url_existing);
+
+            image_url_1 = selfie_url_existing;
+            image_url_2 = selfie_url;
+
+        } else {
+            return Err(vec![ApiError {
+                entity: "HACKATHON_BI_2025".to_string(),
+                code: "1004".to_string(),
+                cause: "INVALID_SUBMISSION_TYPE".to_string(),
+            }]);
+        }
 
         // 7. Perform face matching
         let face_match_result = match face_match_service.compare_faces(
-            selfie_url,
-            nfc_url,
+            image_url_1,
+            image_url_2,
             submission_id.clone(),
         ).await {
             Ok(result) => result,

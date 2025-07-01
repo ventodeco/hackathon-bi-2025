@@ -51,27 +51,12 @@ impl SubmissionRepository {
         Ok(())
     }
 
-    pub async fn find_by_submission_id(&self, submission_id: Uuid) -> Result<Option<Value>, sqlx::Error> {
-        let result = sqlx::query!(
-            r#"
-            SELECT submission_data
-            FROM submissions
-            WHERE submission_id = $1
-            "#,
-            submission_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(result.and_then(|r| r.submission_data.and_then(|s| serde_json::from_str(&s).ok())))
-    }
-
-    pub async fn find_submission_by_id(&self, submission_id: &str) -> Result<Option<(String, Value)>, sqlx::Error> {
+    pub async fn find_submission_by_id(&self, submission_id: &str) -> Result<Option<(String, String, Value)>, sqlx::Error> {
         let submission_uuid = Uuid::parse_str(submission_id).map_err(|_| sqlx::Error::RowNotFound)?;
         
         let result = sqlx::query!(
             r#"
-            SELECT status, submission_data
+            SELECT submission_data, submission_type, nfc_identifier
             FROM submissions
             WHERE submission_id = $1
             "#,
@@ -81,11 +66,12 @@ impl SubmissionRepository {
         .await?;
 
         Ok(result.map(|r| {
-            let status = r.status;
+            let submission_type = r.submission_type;
+            let nfc_identifier = r.nfc_identifier.unwrap_or_default();
             let data = r.submission_data
                 .and_then(|s| serde_json::from_str(&s).ok())
                 .unwrap_or(json!({}));
-            (status, data)
+            (submission_type, nfc_identifier, data)
         }))
     }
 
@@ -105,6 +91,29 @@ impl SubmissionRepository {
         .await?;
 
         Ok(())
+    }
+
+    pub async fn find_submission_by_nfc_identifier_and_status(&self, nfc_identifier: &str, status: &str) -> Result<Option<Value>, sqlx::Error> {
+        
+        let result = sqlx::query!(
+            r#"
+            SELECT submission_data
+            FROM submissions
+            WHERE nfc_identifier = $1 AND status = $2
+            order by id desc limit 1
+            "#,
+            nfc_identifier,
+            status
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.map(|r| {
+            let data = r.submission_data
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or(json!({}));
+            data
+        }))
     }
 
     pub async fn find_submission_by_nfc_identifier_and_submission_type(&self, submission_type: &str, nfc_identifier: &str) -> Result<Option<String>, sqlx::Error> {
