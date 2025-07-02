@@ -145,7 +145,7 @@ impl SubmissionService {
                 "INITIATED",
                 json!(documents_data),
                 json!({}),
-                nfc_identifier_clean.chars().take(500).collect::<String>(),
+                nfc_identifier_clean.clone().chars().take(500).collect::<String>(),
             )
             .await
         {

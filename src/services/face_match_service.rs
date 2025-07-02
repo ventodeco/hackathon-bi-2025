@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde_json::json;
 use std::time::Duration;
 
 use crate::services::metrics_service::MetricsService;
@@ -59,14 +60,20 @@ impl FaceMatchService {
         tags.insert("endpoint".to_string(), "face_match".to_string());
 
         let url = format!(
-            "{}/compare-faces?image1_url={}&image2_url={}",
-            self.base_url, image1_url, image2_url
+            "{}/compare-faces", self.base_url
         );
+
+        let body = json!({
+            "image1_url": image1_url,
+            "image2_url": image2_url,
+            "threshold": self.threshold,
+        });
 
         let response = match self
             .client
             .post(&url)
             .header("x-submission-id", &submission_id)
+            .body(body.to_string())
             .send()
             .await
         {
